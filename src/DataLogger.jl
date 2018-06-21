@@ -33,21 +33,14 @@ function handle_message(logger::DataRecorder, level, message, _module, group, id
     iob = IOContext(buf, logger.stream)
     levelstr = level == Warn ? "Warning" : string(level)
     msglines = split(chomp(string(message)), '\n')
-    printstyled(iob, "Record", color=:green)
-    printstyled(iob, " ( ", color=:yellow)
     printstyled(iob, _module, " ", basename(filepath))
     printstyled(iob, "#", color=:light_black)
-    printstyled(iob, line)
-    printstyled(iob, " )", color=:yellow)
-    printstyled(iob, ' ', msglines[1], color=:light_cyan)
-    #for i in 2:length(msglines)
-    #    println(iob, "│ ", msglines[i])
-    #end
-    if length(kwargs) != 0
-        print(iob, ' ')
-    end
+    printstyled(iob, line, "  ")
+    printstyled(iob, msglines[1], color=:cyan)
     for (key, val) in kwargs
-        print(iob, "  ", key, " = ", val)
+        printstyled(iob, "    ", key, color=:green)
+        printstyled(iob, " = ")
+        printstyled(iob, val)
     end
     printstyled(iob, '\n')
     write(logger.stream, take!(buf))
@@ -130,6 +123,18 @@ end
 const Record = LogLevel(1)
 macro record(message, exs...)
     logmsg_code2((Base.CoreLogging.@_sourceinfo)..., :Record,  message, exs...)
+end
+
+function run(f)
+    logger = DataRecorder(; stream=stdout)
+    global_logger(logger)
+    f()
+    global_logger(ConsoleLogger())
+end
+
+function run()
+    logger = DataRecorder(; stream=stdout)
+    global_logger(logger)
 end
 
 function read_stdout(f)
