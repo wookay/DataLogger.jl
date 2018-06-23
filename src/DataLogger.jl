@@ -7,6 +7,7 @@ import Logging: ConsoleLogger
 import Base.CoreLogging: AbstractLogger, LogLevel, Debug, Warn, min_enabled_level, _min_enabled_level, handle_message, current_logger_for_env, shouldlog, logging_error, log_record_id
 import Base: global_logger
 
+module_styles = Dict{Module,Any}()
 
 struct DataRecorder <: AbstractLogger
     stream::IO
@@ -20,7 +21,6 @@ end
 min_enabled_level(logger::DataRecorder) = logger.min_level
 shouldlog(logger::DataRecorder, level, _module, group, id) = get(logger.message_limits, id, 1) > 0
 
-
 # code from julia/base/logging.jl  handle_message
 function handle_message(logger::DataRecorder, level, message, _module, group, id,
                         filepath, line; maxlog=nothing, kwargs...)
@@ -32,15 +32,27 @@ function handle_message(logger::DataRecorder, level, message, _module, group, id
     buf = IOBuffer()
     iob = IOContext(buf, logger.stream)
     levelstr = level == Warn ? "Warning" : string(level)
-    msglines = split(chomp(string(message)), '\n')
-    printstyled(iob, _module, " ", basename(filepath))
+    if _module === Main
+        printstyled(iob, _module)
+    else
+        if !haskey(module_styles, _module)
+            module_styles[_module] = (color=rand(20:230),)
+        end
+        sytle = module_styles[_module]
+        printstyled(iob, _module, color=sytle[:color])
+    end
+    printstyled(iob, " ", basename(filepath))
     printstyled(iob, "#", color=:light_black)
     printstyled(iob, line, "  ")
-    printstyled(iob, msglines[1], color=:cyan)
-    for (key, val) in kwargs
-        printstyled(iob, "    ", key, color=:green)
-        printstyled(iob, " = ")
-        printstyled(iob, val)
+    if length(kwargs) == 0
+        printstyled(iob, message)
+    else
+        printstyled(iob, message, color=:cyan)
+        for (key, val) in kwargs
+            printstyled(iob, "    ", key, color=:green)
+            printstyled(iob, " = ")
+            printstyled(iob, val)
+        end
     end
     printstyled(iob, '\n')
     write(logger.stream, take!(buf))
